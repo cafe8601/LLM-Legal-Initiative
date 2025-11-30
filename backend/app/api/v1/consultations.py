@@ -268,6 +268,7 @@ async def create_consultation(
             service.start_turn_processing,
             consultation.id,
             1,  # First turn
+            current_user.id,  # user_id for memory system
             memory_ctx,
             data.complexity,
         )
@@ -431,6 +432,7 @@ async def add_turn(
             service.start_turn_processing,
             consultation_id,
             turn.turn_number,
+            current_user.id,  # user_id for memory system
             memory_ctx,
             data.complexity,
         )

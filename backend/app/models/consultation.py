@@ -5,6 +5,7 @@ Consultation Models
 """
 
 from datetime import datetime
+from enum import Enum
 from typing import TYPE_CHECKING
 from uuid import UUID
 
@@ -20,16 +21,20 @@ if TYPE_CHECKING:
     from app.models.memory import UserMemory
 
 
-class ConsultationStatus(str):
+class ConsultationStatus(str, Enum):
     """Consultation status values."""
 
     PENDING = "pending"  # 대기 중
+    ANALYZING = "analyzing"  # 분석 중
+    DRAFTING = "drafting"  # 초안 작성 중
+    REVIEWING = "reviewing"  # 검토 중
+    SYNTHESIZING = "synthesizing"  # 종합 중
     PROCESSING = "processing"  # 처리 중
     COMPLETED = "completed"  # 완료
     FAILED = "failed"  # 실패
 
 
-class ConsultationCategory(str):
+class ConsultationCategory(str, Enum):
     """Legal consultation categories."""
 
     GENERAL = "general"  # 일반 법률

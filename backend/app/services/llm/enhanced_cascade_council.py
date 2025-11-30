@@ -413,19 +413,22 @@ class EnhancedCascadeCouncil:
                 # 성공 여부 판단 (간단한 휴리스틱)
                 success = len(opinion.content) > 200 and not opinion.error
 
-                outcome_id = await learning_manager.record_consultation_outcome(
-                    consultation_id=str(consultation_id),
+                # record_consultation_outcome은 동기 메서드이므로 to_thread로 호출
+                outcome_id = await asyncio.to_thread(
+                    learning_manager.record_consultation_outcome,
                     agent_id=agent_id,
                     model_id=model_id,
+                    tier=tier,
+                    consultation_id=str(consultation_id),
+                    user_id=str(user_id),
                     category=category,
                     query=query,
-                    response_summary=opinion.content[:500],
-                    tier=tier,
                     success=success,
-                    escalated=opinion.escalated,
-                    latency_ms=opinion.latency_ms,
+                    response_quality=0.8 if success else 0.3,  # 기본 품질 점수
+                    response_time_ms=opinion.latency_ms,
                     tokens_used=opinion.tokens_used,
-                    cost=result.total_estimated_cost / max(len(result.opinions), 1),
+                    cost_usd=result.total_estimated_cost / max(len(result.opinions), 1),
+                    escalated=opinion.escalated,
                 )
 
             # 전체 상담 결과도 경험 RAG에 인덱싱

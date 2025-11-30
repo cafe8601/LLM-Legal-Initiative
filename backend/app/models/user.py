@@ -5,6 +5,7 @@ User Model
 """
 
 from datetime import datetime
+from enum import Enum
 from typing import TYPE_CHECKING
 from uuid import UUID
 
@@ -19,7 +20,7 @@ if TYPE_CHECKING:
     from app.models.memory import UserMemory
 
 
-class UserTier(str):
+class UserTier(str, Enum):
     """User subscription tiers."""
 
     BASIC = "basic"

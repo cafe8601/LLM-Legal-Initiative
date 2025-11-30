@@ -47,13 +47,39 @@ class Settings(BaseSettings):
     # =========================================================================
     # Security
     # =========================================================================
-    SECRET_KEY: str = "change-this-in-production"
+    SECRET_KEY: str = Field(
+        default="",
+        description="JWT 서명용 비밀 키 (프로덕션에서 반드시 설정 필요)"
+    )
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     # CORS
     CORS_ORIGINS: list[str] = ["http://localhost:3000", "http://localhost:5173"]
+
+    @field_validator("SECRET_KEY", mode="after")
+    @classmethod
+    def validate_secret_key(cls, v: str) -> str:
+        """프로덕션 환경에서 SECRET_KEY 설정 검증."""
+        import os
+        import warnings
+
+        if not v or v == "change-this-in-production":
+            env = os.getenv("ENVIRONMENT", "development")
+            if env == "production":
+                raise ValueError(
+                    "프로덕션 환경에서는 SECRET_KEY를 반드시 설정해야 합니다. "
+                    "안전한 랜덤 키 생성: python -c \"import secrets; print(secrets.token_urlsafe(32))\""
+                )
+            # 개발 환경에서는 경고와 함께 기본값 사용
+            warnings.warn(
+                "SECRET_KEY가 설정되지 않았습니다. 개발 환경에서만 기본값을 사용합니다.",
+                UserWarning,
+                stacklevel=2,
+            )
+            return "dev-only-secret-key-not-for-production"
+        return v
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
