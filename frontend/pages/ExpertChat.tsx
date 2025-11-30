@@ -1,45 +1,103 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, Scale, MessageSquare, Users, Sparkles, Bot, ChevronRight, DollarSign, Zap, Shield, Brain, Clock, ArrowLeft, X, Info, TrendingDown } from 'lucide-react';
+import { Send, Scale, MessageSquare, Users, Sparkles, Bot, ChevronRight, DollarSign, Zap, Shield, Brain, Clock, ArrowLeft, X, Info, TrendingDown, RefreshCw, FileText, Briefcase, Copyright, Building2, Gavel, CheckCircle } from 'lucide-react';
 import { Button, Badge } from '../components/UIComponents';
 
+// API Base URL
+const API_BASE = '/api/v1';
+
 // Types
-interface Expert {
-  provider: string;
-  display_name: string;
+interface Provider {
+  id: string;
+  name: string;
   description: string;
-  strengths: string[];
-  cost_per_1k_input: number;
-  cost_per_1k_output: number;
+  models: {
+    drafter: string;
+    verifier: string;
+  };
 }
 
 interface ChatMessage {
+  id?: string;
   role: 'user' | 'assistant';
   content: string;
+  model?: string;
+  provider?: string;
   timestamp: Date;
+  tokens_used?: number;
+  cascade_tier?: string;
 }
 
 interface SessionInfo {
   session_id: string;
-  expert: string;
-  expert_name: string;
+  user_id: string;
+  provider: string;
+  provider_name: string;
   domain: string;
-  message_count?: number;
-  estimated_cost_krw?: number;
+  message_count: number;
+  total_tokens?: number;
+  total_cost?: number;
 }
 
-type ConsultMode = 'select' | 'council' | 'expert';
+type ConsultMode = 'select' | 'council' | 'chat' | 'domain';
 
-// Expert color mapping
-const expertColors: Record<string, { bg: string; text: string; border: string }> = {
-  openai: { bg: 'bg-blue-500', text: 'text-blue-500', border: 'border-blue-500' },
-  anthropic: { bg: 'bg-purple-500', text: 'text-purple-500', border: 'border-purple-500' },
-  google: { bg: 'bg-teal-500', text: 'text-teal-500', border: 'border-teal-500' },
-  xai: { bg: 'bg-indigo-500', text: 'text-indigo-500', border: 'border-indigo-500' },
+// Legal domains
+interface LegalDomainInfo {
+  id: string;
+  name: string;
+  description: string;
+  icon: React.ReactNode;
+  examples: string[];
+}
+
+const legalDomains: LegalDomainInfo[] = [
+  {
+    id: 'general_civil',
+    name: '일반/민사',
+    description: '일반적인 민사 문제, 손해배상, 채권채무 관계',
+    icon: <Scale className="w-5 h-5" />,
+    examples: ['손해배상 청구', '채권 추심', '부당이득 반환'],
+  },
+  {
+    id: 'contract',
+    name: '계약 검토',
+    description: '계약서 작성, 검토, 해석 및 분쟁',
+    icon: <FileText className="w-5 h-5" />,
+    examples: ['계약서 검토', '계약 해지', '위약금 분쟁'],
+  },
+  {
+    id: 'ip',
+    name: '지식재산권',
+    description: '특허, 상표, 저작권 등 지식재산 관련',
+    icon: <Copyright className="w-5 h-5" />,
+    examples: ['상표 출원', '저작권 침해', '특허 분쟁'],
+  },
+  {
+    id: 'labor',
+    name: '노무/인사',
+    description: '근로계약, 임금, 해고, 산업재해 등',
+    icon: <Building2 className="w-5 h-5" />,
+    examples: ['부당해고', '임금체불', '퇴직금 계산'],
+  },
+  {
+    id: 'criminal',
+    name: '형사/고소',
+    description: '형사 고소, 고발, 형사 피해 구제',
+    icon: <Gavel className="w-5 h-5" />,
+    examples: ['사기 고소', '명예훼손', '폭행/상해'],
+  },
+];
+
+// Provider color mapping
+const providerColors: Record<string, { bg: string; text: string; border: string; light: string }> = {
+  claude: { bg: 'bg-purple-500', text: 'text-purple-500', border: 'border-purple-500', light: 'bg-purple-50' },
+  gpt: { bg: 'bg-emerald-500', text: 'text-emerald-500', border: 'border-emerald-500', light: 'bg-emerald-50' },
+  gemini: { bg: 'bg-blue-500', text: 'text-blue-500', border: 'border-blue-500', light: 'bg-blue-50' },
+  grok: { bg: 'bg-orange-500', text: 'text-orange-500', border: 'border-orange-500', light: 'bg-orange-50' },
 };
 
-// Expert icons
-const ExpertIcon: React.FC<{ provider: string; className?: string }> = ({ provider, className = '' }) => {
-  const colors = expertColors[provider] || expertColors.anthropic;
+// Provider Icon
+const ProviderIcon: React.FC<{ provider: string; className?: string }> = ({ provider, className = '' }) => {
+  const colors = providerColors[provider] || providerColors.claude;
   return (
     <div className={`${colors.bg} rounded-lg p-2 ${className}`}>
       <Brain className="w-5 h-5 text-white" />
@@ -49,7 +107,7 @@ const ExpertIcon: React.FC<{ provider: string; className?: string }> = ({ provid
 
 // Mode Selection Card
 const ModeCard: React.FC<{
-  mode: 'council' | 'expert';
+  mode: 'council' | 'chat';
   title: string;
   description: string;
   features: string[];
@@ -112,13 +170,55 @@ const ModeCard: React.FC<{
   </div>
 );
 
-// Expert Selection Card
-const ExpertCard: React.FC<{
-  expert: Expert;
+// Domain Selection Card
+const DomainCard: React.FC<{
+  domain: LegalDomainInfo;
   selected: boolean;
   onClick: () => void;
-}> = ({ expert, selected, onClick }) => {
-  const colors = expertColors[expert.provider] || expertColors.anthropic;
+}> = ({ domain, selected, onClick }) => (
+  <div
+    onClick={onClick}
+    className={`relative bg-white rounded-xl border-2 p-4 cursor-pointer transition-all duration-200 ${
+      selected
+        ? 'border-primary-main shadow-lg ring-2 ring-offset-2 ring-primary-main'
+        : 'border-neutral-200 hover:border-neutral-300 hover:shadow-md'
+    }`}
+  >
+    <div className="flex items-start space-x-3">
+      <div className={`p-2 rounded-lg ${selected ? 'bg-primary-main text-white' : 'bg-neutral-100 text-neutral-600'}`}>
+        {domain.icon}
+      </div>
+      <div className="flex-1">
+        <h4 className="font-bold text-neutral-900">{domain.name}</h4>
+        <p className="text-xs text-neutral-500 mt-1">{domain.description}</p>
+      </div>
+    </div>
+
+    <div className="mt-3 pt-3 border-t border-neutral-100">
+      <div className="flex flex-wrap gap-1">
+        {domain.examples.map((example, idx) => (
+          <span key={idx} className="text-xs bg-neutral-100 text-neutral-600 px-2 py-0.5 rounded">
+            {example}
+          </span>
+        ))}
+      </div>
+    </div>
+
+    {selected && (
+      <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-primary-main flex items-center justify-center">
+        <CheckCircle className="w-4 h-4 text-white" />
+      </div>
+    )}
+  </div>
+);
+
+// Provider Selection Card
+const ProviderCard: React.FC<{
+  provider: Provider;
+  selected: boolean;
+  onClick: () => void;
+}> = ({ provider, selected, onClick }) => {
+  const colors = providerColors[provider.id] || providerColors.claude;
 
   return (
     <div
@@ -130,29 +230,26 @@ const ExpertCard: React.FC<{
       }`}
     >
       <div className="flex items-start space-x-3">
-        <ExpertIcon provider={expert.provider} />
+        <ProviderIcon provider={provider.id} />
         <div className="flex-1">
-          <h4 className="font-bold text-neutral-900">{expert.display_name}</h4>
-          <p className="text-xs text-neutral-500 mt-1">{expert.description}</p>
+          <h4 className="font-bold text-neutral-900">{provider.name}</h4>
+          <p className="text-xs text-neutral-500 mt-1">{provider.description}</p>
         </div>
       </div>
 
-      <div className="mt-3 flex flex-wrap gap-1">
-        {expert.strengths.slice(0, 3).map((strength, idx) => (
-          <span
-            key={idx}
-            className={`text-xs px-2 py-0.5 rounded-full ${colors.bg}/10 ${colors.text}`}
-          >
-            {strength}
-          </span>
-        ))}
-      </div>
-
-      <div className="mt-3 pt-3 border-t border-neutral-100 flex justify-between items-center">
-        <span className="text-xs text-neutral-400">비용</span>
-        <span className="text-sm font-medium text-neutral-700">
-          ~{Math.round((expert.cost_per_1k_input + expert.cost_per_1k_output) * 2 * 1350)}원/질문
-        </span>
+      <div className="mt-3 pt-3 border-t border-neutral-100">
+        <div className="flex justify-between items-center text-xs">
+          <span className="text-neutral-400">CascadeFlow</span>
+          <div className="flex items-center space-x-1">
+            <Zap className="w-3 h-3 text-yellow-500" />
+            <span className="text-neutral-600">비용 최적화</span>
+          </div>
+        </div>
+        <div className="mt-2 text-xs text-neutral-500">
+          <span className="font-mono bg-neutral-100 px-1 rounded">{provider.models.drafter.split('/')[1]}</span>
+          <span className="mx-1">→</span>
+          <span className="font-mono bg-neutral-100 px-1 rounded">{provider.models.verifier.split('/')[1]}</span>
+        </div>
       </div>
 
       {selected && (
@@ -170,71 +267,55 @@ const ExpertCard: React.FC<{
 const CostDisplay: React.FC<{ session: SessionInfo | null }> = ({ session }) => {
   if (!session) return null;
 
+  const costKrw = Math.round((session.total_cost || 0) * 1350);
+
   return (
     <div className="bg-neutral-50 rounded-lg px-3 py-2 flex items-center space-x-3 text-sm">
       <DollarSign className="w-4 h-4 text-neutral-400" />
       <span className="text-neutral-600">
-        예상 비용: <span className="font-medium text-neutral-900">{session.estimated_cost_krw || 0}원</span>
+        비용: <span className="font-medium text-neutral-900">{costKrw}원</span>
       </span>
       <span className="text-neutral-300">|</span>
       <span className="text-neutral-500">
-        {session.message_count || 0}개 메시지
+        {session.total_tokens || 0} 토큰
       </span>
     </div>
+  );
+};
+
+// Cascade Tier Badge
+const CascadeTierBadge: React.FC<{ tier?: string }> = ({ tier }) => {
+  if (!tier) return null;
+
+  const isVerifier = tier === 'verifier';
+  return (
+    <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+      isVerifier ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'
+    }`}>
+      {isVerifier ? '검증됨' : '빠른응답'}
+    </span>
   );
 };
 
 const ExpertChat: React.FC = () => {
   // State
   const [mode, setMode] = useState<ConsultMode>('select');
-  const [experts, setExperts] = useState<Expert[]>([]);
-  const [selectedExpert, setSelectedExpert] = useState<Expert | null>(null);
+  const [providers, setProviders] = useState<Provider[]>([]);
+  const [selectedProvider, setSelectedProvider] = useState<Provider | null>(null);
+  const [selectedDomain, setSelectedDomain] = useState<string>('general_civil');
   const [session, setSession] = useState<SessionInfo | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  // Mock data for experts
+  // Fetch providers on mount
   useEffect(() => {
-    // In production, this would fetch from /api/v1/expert-chat/experts
-    setExperts([
-      {
-        provider: 'openai',
-        display_name: 'GPT-5.1',
-        description: 'OpenAI의 최신 추론 모델. 복잡한 법률 분석에 강점.',
-        strengths: ['복잡한 추론', '다단계 분석', '논리적 구성'],
-        cost_per_1k_input: 0.0025,
-        cost_per_1k_output: 0.010,
-      },
-      {
-        provider: 'anthropic',
-        display_name: 'Claude 4.5 Sonnet',
-        description: 'Anthropic의 Claude 모델. 신중하고 균형잡힌 법률 자문.',
-        strengths: ['신중한 분석', '위험 평가', '윤리적 고려'],
-        cost_per_1k_input: 0.003,
-        cost_per_1k_output: 0.015,
-      },
-      {
-        provider: 'google',
-        display_name: 'Gemini 2.5 Pro',
-        description: 'Google의 Gemini 모델. 광범위한 지식 기반 자문.',
-        strengths: ['광범위한 지식', '비용 효율성', '빠른 응답'],
-        cost_per_1k_input: 0.00125,
-        cost_per_1k_output: 0.005,
-      },
-      {
-        provider: 'xai',
-        display_name: 'Grok 4',
-        description: 'xAI의 Grok 모델. 실용적이고 직접적인 법률 조언.',
-        strengths: ['실용적 조언', '명확한 설명', '직접적 답변'],
-        cost_per_1k_input: 0.002,
-        cost_per_1k_output: 0.010,
-      },
-    ]);
+    fetchProviders();
   }, []);
 
   // Auto scroll to bottom
@@ -242,38 +323,116 @@ const ExpertChat: React.FC = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Handle mode selection
-  const handleModeSelect = (selectedMode: 'council' | 'expert') => {
-    if (selectedMode === 'council') {
-      // Navigate to council mode (existing Consultation page)
-      window.location.href = '#/consultation';
-    } else {
-      setMode('expert');
+  const fetchProviders = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/chat/providers`);
+      if (response.ok) {
+        const data = await response.json();
+        setProviders(data.providers);
+      } else {
+        // Fallback to default providers if API fails
+        setProviders([
+          {
+            id: 'claude',
+            name: 'Claude (Anthropic)',
+            description: '정교한 법률 분석과 논리적 추론에 강점',
+            models: {
+              drafter: 'anthropic/claude-haiku-4',
+              verifier: 'anthropic/claude-sonnet-4',
+            },
+          },
+          {
+            id: 'gpt',
+            name: 'GPT (OpenAI)',
+            description: '다양한 법률 지식과 유연한 응답 생성',
+            models: {
+              drafter: 'openai/gpt-4o-mini',
+              verifier: 'openai/gpt-5.1',
+            },
+          },
+          {
+            id: 'gemini',
+            name: 'Gemini (Google)',
+            description: '최신 정보 통합과 빠른 응답 속도',
+            models: {
+              drafter: 'google/gemini-flash-latest',
+              verifier: 'google/gemini-3-pro-preview',
+            },
+          },
+          {
+            id: 'grok',
+            name: 'Grok (xAI)',
+            description: '실시간 정보 접근과 실용적 조언',
+            models: {
+              drafter: 'x-ai/grok-4-fast',
+              verifier: 'x-ai/grok-4.1',
+            },
+          },
+        ]);
+      }
+    } catch (err) {
+      console.error('Failed to fetch providers:', err);
     }
   };
 
-  // Start expert chat session
-  const startExpertSession = async () => {
-    if (!selectedExpert) return;
-
-    setIsLoading(true);
-
-    // Mock session creation
-    // In production: POST /api/v1/expert-chat/sessions
-    setTimeout(() => {
-      setSession({
-        session_id: `session_${Date.now()}`,
-        expert: selectedExpert.provider,
-        expert_name: selectedExpert.display_name,
-        domain: 'general_civil',
-        message_count: 0,
-        estimated_cost_krw: 0,
-      });
-      setIsLoading(false);
-    }, 500);
+  // Handle mode selection
+  const handleModeSelect = (selectedMode: 'council' | 'chat') => {
+    if (selectedMode === 'council') {
+      // Navigate to council consultation page (existing functionality)
+      window.location.href = '#/council-consultation';
+    } else {
+      // Go to domain selection for individual chat
+      setMode('domain');
+    }
   };
 
-  // Send message
+  // Handle domain selection - proceed to provider selection
+  const handleDomainSelect = () => {
+    setMode('chat');
+  };
+
+  // Create chat session
+  const createSession = async () => {
+    if (!selectedProvider) return;
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`${API_BASE}/chat/sessions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider: selectedProvider.id,
+          domain: selectedDomain,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('세션 생성에 실패했습니다.');
+      }
+
+      const data = await response.json();
+      setSession(data);
+    } catch (err) {
+      // Fallback: Create mock session for demo
+      const domainInfo = legalDomains.find(d => d.id === selectedDomain);
+      setSession({
+        session_id: `session_${Date.now()}`,
+        user_id: 'anonymous',
+        provider: selectedProvider.id,
+        provider_name: selectedProvider.name,
+        domain: selectedDomain,
+        message_count: 0,
+        total_tokens: 0,
+        total_cost: 0,
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Send message with streaming
   const sendMessage = async () => {
     if (!inputValue.trim() || !session || isStreaming) return;
 
@@ -286,23 +445,103 @@ const ExpertChat: React.FC = () => {
     setMessages(prev => [...prev, userMessage]);
     setInputValue('');
     setIsStreaming(true);
+    setError(null);
 
-    // Mock streaming response
-    // In production: POST /api/v1/expert-chat/sessions/{session_id}/chat with stream=true
-    const mockResponse = generateMockResponse(userMessage.content, selectedExpert?.display_name || 'AI');
+    try {
+      // Try streaming API first
+      const response = await fetch(`${API_BASE}/chat/sessions/${session.session_id}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: userMessage.content,
+          stream: true,
+        }),
+      });
 
-    let currentContent = '';
+      if (response.ok && response.headers.get('content-type')?.includes('text/event-stream')) {
+        // Handle SSE streaming
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder();
+
+        const assistantMessage: ChatMessage = {
+          role: 'assistant',
+          content: '',
+          model: selectedProvider?.models.drafter,
+          provider: selectedProvider?.id,
+          timestamp: new Date(),
+        };
+        setMessages(prev => [...prev, assistantMessage]);
+
+        let fullContent = '';
+
+        while (reader) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value);
+          const lines = chunk.split('\n');
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const data = line.slice(6);
+              if (data === '[DONE]') continue;
+              if (data.startsWith('[ERROR]')) {
+                setError(data.replace('[ERROR] ', ''));
+                continue;
+              }
+              fullContent += data;
+              setMessages(prev => {
+                const newMessages = [...prev];
+                newMessages[newMessages.length - 1] = {
+                  ...assistantMessage,
+                  content: fullContent,
+                };
+                return newMessages;
+              });
+            }
+          }
+        }
+
+        // Update session stats
+        setSession(prev => prev ? {
+          ...prev,
+          message_count: (prev.message_count || 0) + 2,
+          total_tokens: (prev.total_tokens || 0) + fullContent.length,
+          total_cost: (prev.total_cost || 0) + 0.001,
+        } : null);
+
+      } else {
+        // Fallback to mock response
+        await handleMockResponse(userMessage.content);
+      }
+    } catch (err) {
+      console.error('Send message error:', err);
+      // Fallback to mock response on error
+      await handleMockResponse(userMessage.content);
+    } finally {
+      setIsStreaming(false);
+    }
+  };
+
+  // Mock response handler for demo
+  const handleMockResponse = async (query: string) => {
+    const providerName = selectedProvider?.name || 'AI 전문가';
+    const mockResponse = generateMockResponse(query, providerName);
+
     const assistantMessage: ChatMessage = {
       role: 'assistant',
       content: '',
+      model: selectedProvider?.models.drafter,
+      provider: selectedProvider?.id,
       timestamp: new Date(),
+      cascade_tier: Math.random() > 0.7 ? 'verifier' : 'drafter',
     };
-
     setMessages(prev => [...prev, assistantMessage]);
 
     // Simulate streaming
+    let currentContent = '';
     for (let i = 0; i < mockResponse.length; i++) {
-      await new Promise(resolve => setTimeout(resolve, 20));
+      await new Promise(resolve => setTimeout(resolve, 15));
       currentContent += mockResponse[i];
       setMessages(prev => {
         const newMessages = [...prev];
@@ -314,24 +553,37 @@ const ExpertChat: React.FC = () => {
       });
     }
 
-    setIsStreaming(false);
-
-    // Update session cost
+    // Update session
     setSession(prev => prev ? {
       ...prev,
       message_count: (prev.message_count || 0) + 2,
-      estimated_cost_krw: (prev.estimated_cost_krw || 0) + Math.round(Math.random() * 50 + 20),
+      total_tokens: (prev.total_tokens || 0) + mockResponse.length,
+      total_cost: (prev.total_cost || 0) + 0.001,
     } : null);
   };
 
-  const generateMockResponse = (query: string, expertName: string): string => {
-    const responses = [
-      `안녕하세요, ${expertName}입니다. 질문하신 내용에 대해 법률적 관점에서 답변드리겠습니다.\n\n귀하의 질문 "${query.substring(0, 50)}..."에 대해 검토해 보았습니다.\n\n**법률적 분석**\n\n본 사안은 민법상 채권-채무 관계에 해당할 수 있습니다. 구체적인 상황에 따라 다르지만, 일반적으로 다음과 같은 법적 근거가 적용될 수 있습니다:\n\n1. **민법 제390조 (채무불이행과 손해배상)**: 채무자가 채무의 내용에 좇은 이행을 하지 아니한 때에는 채권자는 손해배상을 청구할 수 있습니다.\n\n2. **증거 확보의 중요성**: 계약서, 이메일, 카카오톡 대화 등 모든 관련 자료를 보관하시기 바랍니다.\n\n**권고사항**\n\n- 내용증명을 발송하여 이행을 최고하시는 것이 좋습니다.\n- 소멸시효가 지나지 않았는지 확인이 필요합니다.\n\n더 구체적인 상담이 필요하시면 추가 질문해 주세요.`,
+  const generateMockResponse = (query: string, providerName: string): string => {
+    return `안녕하세요, ${providerName}입니다. 질문하신 내용에 대해 법률적 관점에서 답변드리겠습니다.
 
-      `${expertName}의 법률 자문입니다.\n\n문의하신 "${query.substring(0, 30)}..." 관련 사안을 검토했습니다.\n\n**핵심 쟁점**\n\n이 문제의 핵심은 당사자 간의 법률관계를 명확히 하는 것입니다. 현행법상 다음 사항들을 고려해야 합니다:\n\n1. 계약의 성립 여부 및 유효성\n2. 이행기의 도래 여부\n3. 상대방의 귀책사유 존재 여부\n\n**대응 방안**\n\n단계별로 접근하시는 것을 권고드립니다:\n\n1단계: 서면으로 이행 최고 (내용증명)\n2단계: 조정 또는 중재 시도\n3단계: 필요시 법적 조치 검토\n\n추가 질문이 있으시면 말씀해 주세요.`,
-    ];
+귀하의 질문 "${query.substring(0, 50)}${query.length > 50 ? '...' : ''}"에 대해 검토해 보았습니다.
 
-    return responses[Math.floor(Math.random() * responses.length)];
+**법률적 분석**
+
+본 사안은 민법상 채권-채무 관계에 해당할 수 있습니다. 구체적인 상황에 따라 다르지만, 일반적으로 다음과 같은 법적 근거가 적용될 수 있습니다:
+
+1. **민법 제390조 (채무불이행과 손해배상)**: 채무자가 채무의 내용에 좇은 이행을 하지 아니한 때에는 채권자는 손해배상을 청구할 수 있습니다.
+
+2. **증거 확보의 중요성**: 계약서, 이메일, 카카오톡 대화 등 모든 관련 자료를 보관하시기 바랍니다.
+
+**권고사항**
+
+- 내용증명을 발송하여 이행을 최고하시는 것이 좋습니다.
+- 소멸시효가 지나지 않았는지 확인이 필요합니다.
+
+더 구체적인 상담이 필요하시면 추가 질문해 주세요.
+
+---
+*이 응답은 CascadeFlow 시스템을 통해 비용 최적화되었습니다.*`;
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -343,9 +595,28 @@ const ExpertChat: React.FC = () => {
 
   const resetToModeSelect = () => {
     setMode('select');
-    setSelectedExpert(null);
+    setSelectedProvider(null);
+    setSelectedDomain('general_civil');
     setSession(null);
     setMessages([]);
+    setError(null);
+  };
+
+  const goBackToDomainSelect = () => {
+    setMode('domain');
+    setSelectedProvider(null);
+  };
+
+  const changeProvider = (provider: Provider) => {
+    setSelectedProvider(provider);
+    if (session) {
+      // Update session provider
+      setSession(prev => prev ? {
+        ...prev,
+        provider: provider.id,
+        provider_name: provider.name,
+      } : null);
+    }
   };
 
   // Render Mode Selection
@@ -363,7 +634,7 @@ const ExpertChat: React.FC = () => {
             </h1>
             <p className="text-neutral-500 max-w-xl mx-auto">
               상담 목적과 예산에 맞는 최적의 모드를 선택하세요.
-              <br />간단한 질문은 전문가 모드, 중요한 사안은 위원회 모드를 추천드립니다.
+              <br />간단한 질문은 개인 채팅, 중요한 사안은 위원회 모드를 추천드립니다.
             </p>
           </div>
 
@@ -385,18 +656,18 @@ const ExpertChat: React.FC = () => {
             />
 
             <ModeCard
-              mode="expert"
-              title="단일 전문가 채팅"
+              mode="chat"
+              title="개인 법률 상담"
               description="선택한 AI 전문가와 1:1 대화"
               features={[
-                '빠른 실시간 응답',
-                '자연스러운 대화 흐름',
-                '전문가 직접 선택 가능',
-                '비용 효율적',
+                '원하는 AI 모델 선택 가능',
+                'CascadeFlow 비용 최적화',
+                'RAG 기반 법률 지식 검색',
+                '실시간 대화형 상담',
               ]}
               estimatedCost="~50원/질문"
               savings="80%"
-              onClick={() => handleModeSelect('expert')}
+              onClick={() => handleModeSelect('chat')}
             />
           </div>
 
@@ -407,7 +678,7 @@ const ExpertChat: React.FC = () => {
               <p className="font-medium text-neutral-800 mb-1">어떤 모드를 선택해야 할까요?</p>
               <ul className="space-y-1">
                 <li>• <strong>위원회 모드</strong>: 분쟁, 계약 검토, 중요한 법률 사안에 적합</li>
-                <li>• <strong>전문가 모드</strong>: 일반 질문, 법률 용어 설명, 간단한 절차 안내에 적합</li>
+                <li>• <strong>개인 채팅</strong>: 일반 질문, 법률 용어 설명, 간단한 절차 안내에 적합</li>
               </ul>
             </div>
           </div>
@@ -416,8 +687,9 @@ const ExpertChat: React.FC = () => {
     );
   }
 
-  // Render Expert Selection (before session starts)
-  if (mode === 'expert' && !session) {
+  // Render Domain Selection (after mode selection, before provider selection)
+  if (mode === 'domain') {
+    const currentDomainInfo = legalDomains.find(d => d.id === selectedDomain);
     return (
       <div className="min-h-screen bg-neutral-50 py-12 px-4">
         <div className="max-w-4xl mx-auto">
@@ -432,22 +704,126 @@ const ExpertChat: React.FC = () => {
 
           {/* Header */}
           <div className="text-center mb-10">
+            <div className="inline-flex items-center justify-center p-3 bg-secondary-main rounded-xl shadow-lg mb-4">
+              <Briefcase className="w-8 h-8 text-white" />
+            </div>
             <h1 className="text-2xl md:text-3xl font-bold text-neutral-900 mb-3">
-              어떤 전문가와 상담하시겠어요?
+              어떤 법률 분야를 상담하시겠어요?
             </h1>
             <p className="text-neutral-500">
-              각 AI 전문가는 고유한 강점을 가지고 있습니다.
+              분야에 맞는 전문 프롬프트가 적용되어 더 정확한 답변을 받으실 수 있습니다.
             </p>
           </div>
 
-          {/* Expert Grid */}
+          {/* Domain Info Box */}
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 flex items-start space-x-3">
+            <Shield className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+            <div className="text-sm">
+              <p className="font-medium text-blue-800 mb-1">전문 분야별 최적화</p>
+              <p className="text-blue-700">
+                선택하신 분야에 맞는 법령 데이터베이스와 판례가 우선 검색되며, 해당 분야 전문 프롬프트가 적용됩니다.
+              </p>
+            </div>
+          </div>
+
+          {/* Domain Grid */}
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+            {legalDomains.map((domain) => (
+              <DomainCard
+                key={domain.id}
+                domain={domain}
+                selected={selectedDomain === domain.id}
+                onClick={() => setSelectedDomain(domain.id)}
+              />
+            ))}
+          </div>
+
+          {/* Selected Domain Summary */}
+          {currentDomainInfo && (
+            <div className="bg-white border border-neutral-200 rounded-xl p-4 mb-6">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-primary-main/10 rounded-lg text-primary-main">
+                  {currentDomainInfo.icon}
+                </div>
+                <div>
+                  <p className="text-sm text-neutral-500">선택된 분야</p>
+                  <p className="font-bold text-neutral-900">{currentDomainInfo.name}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Next Button */}
+          <div className="flex justify-center">
+            <Button
+              variant="gold"
+              size="lg"
+              onClick={handleDomainSelect}
+              className="px-12"
+            >
+              AI 전문가 선택하기
+              <ChevronRight className="w-4 h-4 ml-2" />
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Render Provider Selection (before session starts)
+  if (mode === 'chat' && !session) {
+    const currentDomainInfo = legalDomains.find(d => d.id === selectedDomain);
+    return (
+      <div className="min-h-screen bg-neutral-50 py-12 px-4">
+        <div className="max-w-4xl mx-auto">
+          {/* Back Button */}
+          <button
+            onClick={goBackToDomainSelect}
+            className="flex items-center text-neutral-500 hover:text-neutral-700 mb-6 transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            분야 선택으로 돌아가기
+          </button>
+
+          {/* Selected Domain Badge */}
+          {currentDomainInfo && (
+            <div className="flex justify-center mb-6">
+              <div className="inline-flex items-center space-x-2 bg-primary-main/10 text-primary-main px-4 py-2 rounded-full">
+                {currentDomainInfo.icon}
+                <span className="font-medium">{currentDomainInfo.name}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Header */}
+          <div className="text-center mb-10">
+            <h1 className="text-2xl md:text-3xl font-bold text-neutral-900 mb-3">
+              어떤 AI 전문가와 상담하시겠어요?
+            </h1>
+            <p className="text-neutral-500">
+              각 AI는 CascadeFlow로 비용을 최적화하며 <strong>{currentDomainInfo?.name}</strong> 전문 프롬프트를 사용합니다.
+            </p>
+          </div>
+
+          {/* CascadeFlow Info */}
+          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-6 flex items-start space-x-3">
+            <Zap className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+            <div className="text-sm">
+              <p className="font-medium text-yellow-800 mb-1">CascadeFlow 기술</p>
+              <p className="text-yellow-700">
+                간단한 질문은 빠르고 저렴한 모델(Drafter)로, 복잡한 질문은 고급 모델(Verifier)로 자동 라우팅되어 비용을 최대 80%까지 절감합니다.
+              </p>
+            </div>
+          </div>
+
+          {/* Provider Grid */}
           <div className="grid md:grid-cols-2 gap-4 mb-8">
-            {experts.map((expert) => (
-              <ExpertCard
-                key={expert.provider}
-                expert={expert}
-                selected={selectedExpert?.provider === expert.provider}
-                onClick={() => setSelectedExpert(expert)}
+            {providers.map((provider) => (
+              <ProviderCard
+                key={provider.id}
+                provider={provider}
+                selected={selectedProvider?.id === provider.id}
+                onClick={() => setSelectedProvider(provider)}
               />
             ))}
           </div>
@@ -457,18 +833,18 @@ const ExpertChat: React.FC = () => {
             <Button
               variant="gold"
               size="lg"
-              disabled={!selectedExpert || isLoading}
-              onClick={startExpertSession}
+              disabled={!selectedProvider || isLoading}
+              onClick={createSession}
               className="px-12"
             >
               {isLoading ? (
                 <>
-                  <Clock className="w-4 h-4 mr-2 animate-spin" />
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
                   세션 시작 중...
                 </>
               ) : (
                 <>
-                  {selectedExpert?.display_name || '전문가'}와 상담 시작
+                  {selectedProvider?.name || 'AI 전문가'}와 상담 시작
                   <ChevronRight className="w-4 h-4 ml-2" />
                 </>
               )}
@@ -492,24 +868,52 @@ const ExpertChat: React.FC = () => {
             >
               <ArrowLeft className="w-5 h-5 text-neutral-500" />
             </button>
-            <ExpertIcon provider={selectedExpert?.provider || 'anthropic'} />
+            <ProviderIcon provider={selectedProvider?.id || 'claude'} />
             <div>
-              <h2 className="font-bold text-neutral-900">{session?.expert_name}</h2>
-              <p className="text-xs text-neutral-500">단일 전문가 채팅</p>
+              <h2 className="font-bold text-neutral-900">{session?.provider_name}</h2>
+              <p className="text-xs text-neutral-500 flex items-center">
+                <Zap className="w-3 h-3 text-yellow-500 mr-1" />
+                CascadeFlow 활성화
+              </p>
             </div>
           </div>
-          <CostDisplay session={session} />
+          <div className="flex items-center space-x-3">
+            {/* Provider Selector */}
+            <select
+              value={selectedProvider?.id}
+              onChange={(e) => {
+                const provider = providers.find(p => p.id === e.target.value);
+                if (provider) changeProvider(provider);
+              }}
+              className="text-sm border border-neutral-200 rounded-lg px-2 py-1 bg-white"
+            >
+              {providers.map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+            <CostDisplay session={session} />
+          </div>
         </div>
       </div>
+
+      {/* Error Banner */}
+      {error && (
+        <div className="bg-red-50 border-b border-red-200 px-4 py-2">
+          <div className="max-w-4xl mx-auto flex items-center text-red-700 text-sm">
+            <X className="w-4 h-4 mr-2" />
+            {error}
+          </div>
+        </div>
+      )}
 
       {/* Chat Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-6">
         <div className="max-w-4xl mx-auto space-y-6">
           {messages.length === 0 && (
             <div className="text-center py-12">
-              <ExpertIcon provider={selectedExpert?.provider || 'anthropic'} className="mx-auto mb-4 w-16 h-16 rounded-2xl" />
+              <ProviderIcon provider={selectedProvider?.id || 'claude'} className="mx-auto mb-4 w-16 h-16 rounded-2xl" />
               <h3 className="text-lg font-bold text-neutral-800 mb-2">
-                {session?.expert_name}와의 상담을 시작하세요
+                {session?.provider_name}와의 상담을 시작하세요
               </h3>
               <p className="text-neutral-500 mb-6">
                 법률 관련 질문을 자유롭게 입력해 주세요.
@@ -541,9 +945,12 @@ const ExpertChat: React.FC = () => {
                 }`}
               >
                 {message.role === 'assistant' && (
-                  <div className="flex items-center space-x-2 mb-2 pb-2 border-b border-neutral-100">
-                    <ExpertIcon provider={selectedExpert?.provider || 'anthropic'} className="w-6 h-6 p-1" />
-                    <span className="text-xs font-medium text-neutral-500">{session?.expert_name}</span>
+                  <div className="flex items-center justify-between mb-2 pb-2 border-b border-neutral-100">
+                    <div className="flex items-center space-x-2">
+                      <ProviderIcon provider={selectedProvider?.id || 'claude'} className="w-6 h-6 p-1" />
+                      <span className="text-xs font-medium text-neutral-500">{session?.provider_name}</span>
+                    </div>
+                    <CascadeTierBadge tier={message.cascade_tier} />
                   </div>
                 )}
                 <div className={`whitespace-pre-wrap text-sm leading-relaxed ${

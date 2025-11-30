@@ -6,7 +6,7 @@ API v1 Router
 
 from fastapi import APIRouter
 
-from app.api.v1 import auth, consultations, documents, search, users, contact, expert_chat
+from app.api.v1 import auth, consultations, documents, search, users, contact, expert_chat, chat
 
 api_router = APIRouter()
 
@@ -18,3 +18,4 @@ api_router.include_router(search.router)
 api_router.include_router(users.router)
 api_router.include_router(contact.router)
 api_router.include_router(expert_chat.router)
+api_router.include_router(chat.router)  # 개인 채팅 API (CascadeFlow)
