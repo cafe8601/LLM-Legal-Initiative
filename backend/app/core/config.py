@@ -83,10 +83,14 @@ class Settings(BaseSettings):
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
-    def parse_cors_origins(cls, v: str | list[str]) -> list[str]:
+    def parse_cors_origins(cls, v: str | list[str] | None) -> list[str]:
         """Parse CORS origins from comma-separated string or list."""
+        if v is None:
+            return ["http://localhost:3000", "http://localhost:5173"]
         if isinstance(v, str):
-            return [origin.strip() for origin in v.split(",")]
+            if not v.strip():
+                return ["http://localhost:3000", "http://localhost:5173"]
+            return [origin.strip() for origin in v.split(",") if origin.strip()]
         return v
 
     # =========================================================================
@@ -156,10 +160,14 @@ class Settings(BaseSettings):
 
     @field_validator("OPENROUTER_COUNCIL_MODELS", mode="before")
     @classmethod
-    def parse_council_models(cls, v: str | list[str]) -> list[str]:
+    def parse_council_models(cls, v: str | list[str] | None) -> list[str]:
         """Parse council models from comma-separated string or list."""
+        if v is None:
+            return ["openai/gpt-4o", "anthropic/claude-3.5-sonnet", "google/gemini-1.5-pro"]
         if isinstance(v, str):
-            return [model.strip() for model in v.split(",")]
+            if not v.strip():
+                return ["openai/gpt-4o", "anthropic/claude-3.5-sonnet", "google/gemini-1.5-pro"]
+            return [model.strip() for model in v.split(",") if model.strip()]
         return v
 
     # =========================================================================
