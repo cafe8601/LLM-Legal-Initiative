@@ -1,0 +1,21 @@
+{
+  "outcome_id": "success_20251130122907505581",
+  "timestamp": "2025-11-30T12:29:07.505587+00:00",
+  "agent_id": "claude-sonnet",
+  "model_id": "anthropic/claude-sonnet-4",
+  "tier": "drafter",
+  "consultation_id": "e1d8bf4a-798b-4bc3-aa8a-fde637adf822",
+  "user_id": "526ad3a9-752e-422f-9dab-3427fae1f5e4",
+  "category": "민사",
+  "query_complexity": "moderate",
+  "status": "success",
+  "response_quality": 0.85,
+  "response_time_ms": 1500,
+  "tokens_used": 500,
+  "cost_usd": 0.001,
+  "user_feedback": null,
+  "escalation_reason": null,
+  "metadata": {
+    "query": "계약 해지 방법"
+  }
+}

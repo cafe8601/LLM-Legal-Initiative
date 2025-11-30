@@ -1,0 +1,8 @@
+{
+  "name": "LLM Legal Advisory Council",
+  "description": "AI-Powered Legal Consulting Platform featuring a council of 4 advanced LLMs for trustworthy and transparent legal advice.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}

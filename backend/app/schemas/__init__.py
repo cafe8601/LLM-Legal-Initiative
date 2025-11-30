@@ -1,0 +1,108 @@
+"""Pydantic schemas for request/response validation."""
+
+from app.schemas.user import (
+    UserCreate,
+    UserUpdate,
+    UserResponse,
+    UserInDB,
+    TokenResponse,
+    TokenPayload,
+    PasswordReset,
+    PasswordResetConfirm,
+    ContactCreate,
+    ContactResponse,
+)
+from app.schemas.consultation import (
+    ConsultationCreate,
+    ConsultationUpdate,
+    ConsultationResponse,
+    ConsultationListResponse,
+    ConsultationTurnCreate,
+    ConsultationTurnResponse,
+    ModelOpinionResponse,
+    PeerReviewResponse,
+    ConsultationProgress,
+)
+from app.schemas.document import (
+    DocumentCreate,
+    DocumentUpdate,
+    DocumentResponse,
+    CitationResponse,
+    SearchRequest,
+    SearchResponse,
+)
+from app.schemas.common import (
+    PaginationParams,
+    PaginatedResponse,
+    HealthResponse,
+    ErrorResponse,
+    MessageResponse,
+)
+from app.schemas.legal_document import (
+    LegalDocumentType,
+    LegalCategory,
+    CourtType,
+    LegalDocumentMetadata,
+    LegalDocument,
+    LegalDocumentCreate,
+    LegalDocumentResponse,
+    RAGSearchRequest,
+    RAGSearchResult,
+    RAGSearchResponse,
+    GroundedGenerationRequest,
+    GroundedGenerationResponse,
+    CorpusInfo,
+    CorpusStats,
+)
+
+__all__ = [
+    # User
+    "UserCreate",
+    "UserUpdate",
+    "UserResponse",
+    "UserInDB",
+    "TokenResponse",
+    "TokenPayload",
+    "PasswordReset",
+    "PasswordResetConfirm",
+    "ContactCreate",
+    "ContactResponse",
+    # Consultation
+    "ConsultationCreate",
+    "ConsultationUpdate",
+    "ConsultationResponse",
+    "ConsultationListResponse",
+    "ConsultationTurnCreate",
+    "ConsultationTurnResponse",
+    "ModelOpinionResponse",
+    "PeerReviewResponse",
+    "ConsultationProgress",
+    # Document
+    "DocumentCreate",
+    "DocumentUpdate",
+    "DocumentResponse",
+    "CitationResponse",
+    "SearchRequest",
+    "SearchResponse",
+    # Common
+    "PaginationParams",
+    "PaginatedResponse",
+    "HealthResponse",
+    "ErrorResponse",
+    "MessageResponse",
+    # Legal Document (RAG)
+    "LegalDocumentType",
+    "LegalCategory",
+    "CourtType",
+    "LegalDocumentMetadata",
+    "LegalDocument",
+    "LegalDocumentCreate",
+    "LegalDocumentResponse",
+    "RAGSearchRequest",
+    "RAGSearchResult",
+    "RAGSearchResponse",
+    "GroundedGenerationRequest",
+    "GroundedGenerationResponse",
+    "CorpusInfo",
+    "CorpusStats",
+]

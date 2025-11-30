@@ -1,0 +1,108 @@
+# =============================================================================
+# LLM Legal Advisory Council - Docker Compose Test Configuration
+# =============================================================================
+# Usage:
+#   Run tests: docker-compose -f docker-compose.test.yml up --abort-on-container-exit
+#   Cleanup:   docker-compose -f docker-compose.test.yml down -v
+
+version: '3.8'
+
+services:
+  # ---------------------------------------------------------------------------
+  # Test Runner
+  # ---------------------------------------------------------------------------
+  test:
+    build:
+      context: .
+      target: development
+    container_name: legal-council-test
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://test_user:test_password@test-db:5432/test_legal_council
+      - REDIS_URL=redis://test-redis:6379/0
+      - ENVIRONMENT=development
+      - DEBUG=true
+      - LOG_FORMAT=console
+      - LOG_LEVEL=DEBUG
+      - SECRET_KEY=test-secret-key-for-testing-only
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      # 테스트용 캐시 설정
+      - CACHE_DEFAULT_TTL=60
+      - CACHE_SESSION_TTL=120
+      - CACHE_RAG_TTL=30
+      - CACHE_MEMORY_TTL=60
+      - CACHE_MAX_ENTRIES_PER_SESSION=50
+      # 메트릭 설정
+      - METRICS_ENABLED=true
+      - METRICS_PREFIX=legal_council_test
+      # 헬스체크 설정
+      - HEALTH_CHECK_TIMEOUT=10
+      - HEALTH_CHECK_INCLUDE_DETAILS=true
+    depends_on:
+      test-db:
+        condition: service_healthy
+      test-redis:
+        condition: service_healthy
+    volumes:
+      - ./app:/app/app:ro
+      - ./tests:/app/tests:ro
+      - ./pytest.ini:/app/pytest.ini:ro
+      - ./pyproject.toml:/app/pyproject.toml:ro
+      - test_coverage:/app/coverage
+    networks:
+      - test-network
+    command: >
+      pytest tests/
+      -v
+      --tb=short
+      --cov=app
+      --cov-report=term-missing
+      --cov-report=html:coverage/html
+
+  # ---------------------------------------------------------------------------
+  # Test PostgreSQL Database
+  # ---------------------------------------------------------------------------
+  test-db:
+    image: postgres:16-alpine
+    container_name: legal-council-test-db
+    environment:
+      POSTGRES_USER: test_user
+      POSTGRES_PASSWORD: test_password
+      POSTGRES_DB: test_legal_council
+    tmpfs:
+      - /var/lib/postgresql/data  # 메모리에서 실행 (더 빠름)
+    networks:
+      - test-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test_user -d test_legal_council"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ---------------------------------------------------------------------------
+  # Test Redis Cache
+  # ---------------------------------------------------------------------------
+  test-redis:
+    image: redis:7-alpine
+    container_name: legal-council-test-redis
+    networks:
+      - test-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    command: redis-server --appendonly no  # 테스트용이므로 영속성 불필요
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  test-network:
+    driver: bridge
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  test_coverage:
+    driver: local

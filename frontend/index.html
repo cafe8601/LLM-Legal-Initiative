@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LLM Legal Advisory Council - AI 법률 자문 위원회</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=Pretendard:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              primary: {
+                main: 'hsl(215, 60%, 30%)',
+                light: 'hsl(215, 55%, 45%)',
+                dark: 'hsl(215, 65%, 20%)',
+              },
+              secondary: {
+                main: 'hsl(180, 70%, 40%)',
+                light: 'hsl(180, 65%, 55%)',
+                dark: 'hsl(180, 75%, 30%)',
+              },
+              accent: {
+                gold: 'hsl(45, 80%, 50%)',
+                success: 'hsl(145, 65%, 42%)',
+              },
+              neutral: {
+                50: 'hsl(220, 20%, 98%)',
+                100: 'hsl(220, 18%, 96%)',
+                800: 'hsl(220, 15%, 18%)',
+                900: 'hsl(220, 18%, 11%)',
+              }
+            },
+            fontFamily: {
+              sans: ['Pretendard', 'Noto Sans KR', 'sans-serif'],
+              heading: ['Noto Sans KR', 'sans-serif'],
+            },
+            animation: {
+              'float': 'float 6s ease-in-out infinite',
+              'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+            },
+            keyframes: {
+              float: {
+                '0%, 100%': { transform: 'translateY(0)' },
+                '50%': { transform: 'translateY(-20px)' },
+              }
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+      body {
+        font-family: 'Pretendard', sans-serif;
+        overflow-x: hidden;
+      }
+      h1, h2, h3, h4, h5, h6 {
+        font-family: 'Noto Sans KR', sans-serif;
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.554.0",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-router-dom": "https://aistudiocdn.com/react-router-dom@^7.9.6"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body class="bg-neutral-50 text-neutral-900 antialiased selection:bg-secondary-main selection:text-white">
+    <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>
